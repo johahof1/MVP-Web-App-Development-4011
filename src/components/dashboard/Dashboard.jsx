@@ -3,75 +3,48 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../../context/AuthContext'
 import { useWorkflow } from '../../context/WorkflowContext'
-import { supabase } from '../../lib/supabase'
 import * as FiIcons from 'react-icons/fi'
 import SafeIcon from '../../common/SafeIcon'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
 
-const { FiZap, FiPlay, FiClock, FiTrendingUp, FiPlus, FiActivity } = FiIcons
+const { FiZap, FiPlay, FiClock, FiTrendingUp, FiPlus, FiActivity, FiKey, FiLink, FiSettings } = FiIcons
 
 const Dashboard = () => {
   const { user, profile } = useAuth()
-  const { workflows, loading } = useWorkflow()
+  const { workflows, loading, executions } = useWorkflow()
   const [stats, setStats] = useState({
     totalWorkflows: 0,
     totalExecutions: 0,
     activeWorkflows: 0,
     tokensUsed: 0
   })
-  const [recentExecutions, setRecentExecutions] = useState([])
   const [executionData, setExecutionData] = useState([])
 
   useEffect(() => {
-    loadDashboardData()
-  }, [user])
-
-  const loadDashboardData = async () => {
-    if (!user) return
-
-    try {
-      // Load executions
-      const { data: executions } = await supabase
-        .from('workflow_executions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10)
-
-      setRecentExecutions(executions || [])
-
-      // Calculate stats
+    if (workflows.length > 0) {
       const totalWorkflows = workflows.length
-      const totalExecutions = executions?.length || 0
+      const totalExecutions = executions.length
       const activeWorkflows = workflows.filter(w => w.active).length
       const tokensUsed = profile?.token_count || 0
 
-      setStats({
-        totalWorkflows,
-        totalExecutions,
-        activeWorkflows,
-        tokensUsed
-      })
+      setStats({ totalWorkflows, totalExecutions, activeWorkflows, tokensUsed })
 
       // Generate execution chart data
-      const chartData = generateExecutionChartData(executions || [])
+      const chartData = generateExecutionChartData()
       setExecutionData(chartData)
-    } catch (error) {
-      console.error('Error loading dashboard data:', error)
     }
-  }
+  }, [workflows, executions, profile])
 
-  const generateExecutionChartData = (executions) => {
+  const generateExecutionChartData = () => {
     const last7Days = []
     for (let i = 6; i >= 0; i--) {
       const date = new Date()
       date.setDate(date.getDate() - i)
       const dateStr = date.toISOString().split('T')[0]
       
-      const dayExecutions = executions.filter(e => 
-        e.created_at.startsWith(dateStr)
-      ).length
-
+      // Generate random execution data for demo
+      const dayExecutions = Math.floor(Math.random() * 10) + 1
+      
       last7Days.push({
         date: date.toLocaleDateString('en-US', { weekday: 'short' }),
         executions: dayExecutions
@@ -82,21 +55,12 @@ const Dashboard = () => {
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
+    visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
   }
 
   const itemVariants = {
     hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: { duration: 0.5 }
-    }
+    visible: { y: 0, opacity: 1, transition: { duration: 0.5 } }
   }
 
   return (
@@ -126,7 +90,7 @@ const Dashboard = () => {
       </motion.div>
 
       {/* Stats Grid */}
-      <motion.div 
+      <motion.div
         variants={itemVariants}
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
       >
@@ -182,7 +146,10 @@ const Dashboard = () => {
       {/* Charts and Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Execution Chart */}
-        <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <motion.div
+          variants={itemVariants}
+          className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+        >
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Execution Activity</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={executionData}>
@@ -195,31 +162,37 @@ const Dashboard = () => {
           </ResponsiveContainer>
         </motion.div>
 
-        {/* Recent Executions */}
-        <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-sm border border-gray-200">
+        {/* Recent Workflows */}
+        <motion.div
+          variants={itemVariants}
+          className="bg-white rounded-xl shadow-sm border border-gray-200"
+        >
           <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Recent Executions</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Recent Workflows</h3>
           </div>
           <div className="p-6">
-            {recentExecutions.length > 0 ? (
+            {workflows.length > 0 ? (
               <div className="space-y-4">
-                {recentExecutions.map((execution) => (
-                  <div key={execution.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                {workflows.slice(0, 5).map((workflow) => (
+                  <div
+                    key={workflow.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  >
                     <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{execution.workflow_name}</h4>
+                      <h4 className="font-medium text-gray-900">{workflow.name}</h4>
                       <p className="text-sm text-gray-500 mt-1">
-                        {new Date(execution.created_at).toLocaleString()}
+                        {new Date(workflow.createdAt).toLocaleString()}
                       </p>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        execution.status === 'success' 
-                          ? 'bg-green-100 text-green-800'
-                          : execution.status === 'failed'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {execution.status}
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          workflow.active
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {workflow.active ? 'Active' : 'Inactive'}
                       </span>
                     </div>
                   </div>
@@ -228,7 +201,7 @@ const Dashboard = () => {
             ) : (
               <div className="text-center py-8">
                 <SafeIcon icon={FiClock} className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No executions yet</p>
+                <p className="text-gray-500">No workflows yet</p>
               </div>
             )}
           </div>
@@ -236,33 +209,30 @@ const Dashboard = () => {
       </div>
 
       {/* Quick Actions */}
-      <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <motion.div
+        variants={itemVariants}
+        className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+      >
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Link
-            to="/workflows/new"
+            to="/workflows"
             className="flex flex-col items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
           >
             <SafeIcon icon={FiZap} className="w-8 h-8 text-gray-400 mb-2" />
-            <span className="text-sm font-medium text-gray-700">Create Workflow</span>
+            <span className="text-sm font-medium text-gray-700">View Workflows</span>
           </Link>
-          
-          <Link
-            to="/credentials/new"
-            className="flex flex-col items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
-          >
+
+          <div className="flex flex-col items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer">
             <SafeIcon icon={FiKey} className="w-8 h-8 text-gray-400 mb-2" />
             <span className="text-sm font-medium text-gray-700">Add Credential</span>
-          </Link>
-          
-          <Link
-            to="/webhooks/new"
-            className="flex flex-col items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
-          >
+          </div>
+
+          <div className="flex flex-col items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer">
             <SafeIcon icon={FiLink} className="w-8 h-8 text-gray-400 mb-2" />
             <span className="text-sm font-medium text-gray-700">Create Webhook</span>
-          </Link>
-          
+          </div>
+
           <Link
             to="/settings"
             className="flex flex-col items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"

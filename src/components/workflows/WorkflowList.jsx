@@ -5,7 +5,7 @@ import { useWorkflow } from '../../context/WorkflowContext'
 import * as FiIcons from 'react-icons/fi'
 import SafeIcon from '../../common/SafeIcon'
 
-const { FiPlus, FiSearch, FiEdit2, FiTrash2, FiPlay, FiPause, FiCopy, FiMoreVertical } = FiIcons
+const { FiPlus, FiSearch, FiEdit2, FiTrash2, FiPlay, FiPause, FiCopy, FiMoreVertical, FiZap } = FiIcons
 
 const WorkflowList = () => {
   const { workflows, loading, deleteWorkflow, executeWorkflow } = useWorkflow()

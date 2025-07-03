@@ -5,9 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import * as FiIcons from 'react-icons/fi'
 import SafeIcon from '../../common/SafeIcon'
 
-const { 
-  FiHome, FiZap, FiSettings, FiKey, FiLink, FiX, FiUsers, FiCreditCard, FiBarChart3, FiShield 
-} = FiIcons
+const { FiHome, FiZap, FiSettings, FiKey, FiLink, FiX, FiUsers, FiCreditCard, FiBarChart3, FiShield, FiUser } = FiIcons
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const location = useLocation()
@@ -20,6 +18,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     { name: 'Webhooks', href: '/webhooks', icon: FiLink },
     { name: 'Analytics', href: '/analytics', icon: FiBarChart3 },
     { name: 'Billing', href: '/billing', icon: FiCreditCard },
+    { name: 'Profile', href: '/profile', icon: FiUser },
     { name: 'Settings', href: '/settings', icon: FiSettings }
   ]
 
@@ -95,11 +94,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
-                  <SafeIcon 
-                    icon={item.icon} 
+                  <SafeIcon
+                    icon={item.icon}
                     className={`w-5 h-5 mr-3 ${
                       isActive ? 'text-blue-600' : 'text-gray-500'
-                    }`} 
+                    }`}
                   />
                   <span>{item.name}</span>
                 </Link>

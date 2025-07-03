@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
-import N8nApiClient from '../lib/n8n-api'
 import toast from 'react-hot-toast'
 
 const WorkflowContext = createContext()
@@ -18,22 +16,15 @@ const initialState = {
   workflows: [],
   currentWorkflow: null,
   executions: [],
-  credentials: [],
-  webhooks: [],
-  loading: false,
-  n8nClient: null
+  loading: false
 }
 
 function workflowReducer(state, action) {
   switch (action.type) {
     case 'SET_LOADING':
       return { ...state, loading: action.payload }
-    case 'SET_N8N_CLIENT':
-      return { ...state, n8nClient: action.payload }
     case 'SET_WORKFLOWS':
       return { ...state, workflows: action.payload }
-    case 'SET_CURRENT_WORKFLOW':
-      return { ...state, currentWorkflow: action.payload }
     case 'ADD_WORKFLOW':
       return { ...state, workflows: [...state.workflows, action.payload] }
     case 'UPDATE_WORKFLOW':
@@ -50,31 +41,6 @@ function workflowReducer(state, action) {
       }
     case 'SET_EXECUTIONS':
       return { ...state, executions: action.payload }
-    case 'SET_CREDENTIALS':
-      return { ...state, credentials: action.payload }
-    case 'ADD_CREDENTIAL':
-      return { ...state, credentials: [...state.credentials, action.payload] }
-    case 'UPDATE_CREDENTIAL':
-      return {
-        ...state,
-        credentials: state.credentials.map(c => 
-          c.id === action.payload.id ? action.payload : c
-        )
-      }
-    case 'DELETE_CREDENTIAL':
-      return {
-        ...state,
-        credentials: state.credentials.filter(c => c.id !== action.payload)
-      }
-    case 'SET_WEBHOOKS':
-      return { ...state, webhooks: action.payload }
-    case 'ADD_WEBHOOK':
-      return { ...state, webhooks: [...state.webhooks, action.payload] }
-    case 'DELETE_WEBHOOK':
-      return {
-        ...state,
-        webhooks: state.webhooks.filter(w => w.id !== action.payload)
-      }
     default:
       return state
   }
@@ -82,223 +48,171 @@ function workflowReducer(state, action) {
 
 export const WorkflowProvider = ({ children }) => {
   const [state, dispatch] = useReducer(workflowReducer, initialState)
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
 
-  // Initialize n8n client when user profile is available
+  // Load workflows from localStorage
   useEffect(() => {
-    if (profile?.n8n_api_key && profile?.n8n_instance_url) {
-      const client = new N8nApiClient(profile.n8n_instance_url, profile.n8n_api_key)
-      dispatch({ type: 'SET_N8N_CLIENT', payload: client })
+    if (user) {
+      const savedWorkflows = localStorage.getItem('n8n-saas-workflows')
+      if (savedWorkflows) {
+        dispatch({ type: 'SET_WORKFLOWS', payload: JSON.parse(savedWorkflows) })
+      } else {
+        // Create demo workflows
+        const demoWorkflows = [
+          {
+            id: '1',
+            name: 'Email Notification Workflow',
+            description: 'Send email notifications when new users register',
+            active: true,
+            nodes: [
+              { id: 'trigger', type: 'webhook', name: 'Webhook Trigger' },
+              { id: 'email', type: 'email', name: 'Send Email' }
+            ],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          {
+            id: '2',
+            name: 'Data Sync Workflow',
+            description: 'Sync data between CRM and database',
+            active: false,
+            nodes: [
+              { id: 'schedule', type: 'schedule', name: 'Schedule Trigger' },
+              { id: 'api', type: 'api', name: 'API Call' },
+              { id: 'database', type: 'database', name: 'Database Update' }
+            ],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          {
+            id: '3',
+            name: 'Slack Integration',
+            description: 'Post messages to Slack channels',
+            active: true,
+            nodes: [
+              { id: 'trigger', type: 'webhook', name: 'Webhook Trigger' },
+              { id: 'slack', type: 'slack', name: 'Slack Message' }
+            ],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        ]
+        dispatch({ type: 'SET_WORKFLOWS', payload: demoWorkflows })
+        localStorage.setItem('n8n-saas-workflows', JSON.stringify(demoWorkflows))
+      }
     }
-  }, [profile])
+  }, [user])
 
-  // Load workflows when client is ready
+  // Save workflows to localStorage whenever they change
   useEffect(() => {
-    if (state.n8nClient) {
-      loadWorkflows()
-      loadCredentials()
-      loadWebhooks()
+    if (state.workflows.length > 0) {
+      localStorage.setItem('n8n-saas-workflows', JSON.stringify(state.workflows))
     }
-  }, [state.n8nClient])
+  }, [state.workflows])
 
-  const loadWorkflows = async () => {
+  const createWorkflow = async (workflowData) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true })
-      const workflows = await state.n8nClient.getWorkflows()
-      dispatch({ type: 'SET_WORKFLOWS', payload: workflows })
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      const newWorkflow = {
+        id: Date.now().toString(),
+        ...workflowData,
+        active: false,
+        nodes: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+      
+      dispatch({ type: 'ADD_WORKFLOW', payload: newWorkflow })
+      toast.success('Workflow created successfully!')
+      return newWorkflow
     } catch (error) {
-      toast.error('Failed to load workflows')
-      console.error('Error loading workflows:', error)
+      toast.error('Failed to create workflow')
+      throw error
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false })
     }
   }
 
-  const createWorkflow = async (workflowData) => {
-    try {
-      const workflow = await state.n8nClient.createWorkflow(workflowData)
-      dispatch({ type: 'ADD_WORKFLOW', payload: workflow })
-      
-      // Save to database for tracking
-      await saveWorkflowToDatabase(workflow)
-      
-      toast.success('Workflow created successfully!')
-      return workflow
-    } catch (error) {
-      toast.error('Failed to create workflow')
-      throw error
-    }
-  }
-
   const updateWorkflow = async (id, workflowData) => {
     try {
-      const workflow = await state.n8nClient.updateWorkflow(id, workflowData)
-      dispatch({ type: 'UPDATE_WORKFLOW', payload: workflow })
+      dispatch({ type: 'SET_LOADING', payload: true })
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      const updatedWorkflow = {
+        ...state.workflows.find(w => w.id === id),
+        ...workflowData,
+        updatedAt: new Date().toISOString()
+      }
+      
+      dispatch({ type: 'UPDATE_WORKFLOW', payload: updatedWorkflow })
       toast.success('Workflow updated successfully!')
-      return workflow
+      return updatedWorkflow
     } catch (error) {
       toast.error('Failed to update workflow')
       throw error
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false })
     }
   }
 
   const deleteWorkflow = async (id) => {
     try {
-      await state.n8nClient.deleteWorkflow(id)
+      dispatch({ type: 'SET_LOADING', payload: true })
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
       dispatch({ type: 'DELETE_WORKFLOW', payload: id })
-      
-      // Remove from database
-      await removeWorkflowFromDatabase(id)
-      
       toast.success('Workflow deleted successfully!')
     } catch (error) {
       toast.error('Failed to delete workflow')
       throw error
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false })
     }
   }
 
-  const executeWorkflow = async (id, data = {}) => {
+  const executeWorkflow = async (id) => {
     try {
-      const execution = await state.n8nClient.executeWorkflow(id, data)
+      dispatch({ type: 'SET_LOADING', payload: true })
       
-      // Update token count
-      await updateTokenCount(1)
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      const execution = {
+        id: Date.now().toString(),
+        workflow_id: id,
+        workflow_name: state.workflows.find(w => w.id === id)?.name || 'Unknown',
+        status: Math.random() > 0.2 ? 'success' : 'failed',
+        created_at: new Date().toISOString()
+      }
+      
+      // Add to executions
+      const newExecutions = [execution, ...state.executions].slice(0, 10)
+      dispatch({ type: 'SET_EXECUTIONS', payload: newExecutions })
       
       toast.success('Workflow executed successfully!')
       return execution
     } catch (error) {
       toast.error('Failed to execute workflow')
       throw error
-    }
-  }
-
-  const loadCredentials = async () => {
-    try {
-      const credentials = await state.n8nClient.getCredentials()
-      dispatch({ type: 'SET_CREDENTIALS', payload: credentials })
-    } catch (error) {
-      console.error('Error loading credentials:', error)
-    }
-  }
-
-  const createCredential = async (credentialData) => {
-    try {
-      const credential = await state.n8nClient.createCredential(credentialData)
-      dispatch({ type: 'ADD_CREDENTIAL', payload: credential })
-      toast.success('Credential created successfully!')
-      return credential
-    } catch (error) {
-      toast.error('Failed to create credential')
-      throw error
-    }
-  }
-
-  const updateCredential = async (id, credentialData) => {
-    try {
-      const credential = await state.n8nClient.updateCredential(id, credentialData)
-      dispatch({ type: 'UPDATE_CREDENTIAL', payload: credential })
-      toast.success('Credential updated successfully!')
-      return credential
-    } catch (error) {
-      toast.error('Failed to update credential')
-      throw error
-    }
-  }
-
-  const deleteCredential = async (id) => {
-    try {
-      await state.n8nClient.deleteCredential(id)
-      dispatch({ type: 'DELETE_CREDENTIAL', payload: id })
-      toast.success('Credential deleted successfully!')
-    } catch (error) {
-      toast.error('Failed to delete credential')
-      throw error
-    }
-  }
-
-  const loadWebhooks = async () => {
-    try {
-      const webhooks = await state.n8nClient.getWebhooks()
-      dispatch({ type: 'SET_WEBHOOKS', payload: webhooks })
-    } catch (error) {
-      console.error('Error loading webhooks:', error)
-    }
-  }
-
-  const createWebhook = async (webhookData) => {
-    try {
-      const webhook = await state.n8nClient.createWebhook(webhookData)
-      dispatch({ type: 'ADD_WEBHOOK', payload: webhook })
-      toast.success('Webhook created successfully!')
-      return webhook
-    } catch (error) {
-      toast.error('Failed to create webhook')
-      throw error
-    }
-  }
-
-  const deleteWebhook = async (id) => {
-    try {
-      await state.n8nClient.deleteWebhook(id)
-      dispatch({ type: 'DELETE_WEBHOOK', payload: id })
-      toast.success('Webhook deleted successfully!')
-    } catch (error) {
-      toast.error('Failed to delete webhook')
-      throw error
-    }
-  }
-
-  const saveWorkflowToDatabase = async (workflow) => {
-    try {
-      await supabase.from('workflows').insert({
-        id: workflow.id,
-        user_id: user.id,
-        name: workflow.name,
-        data: workflow,
-        created_at: new Date().toISOString()
-      })
-    } catch (error) {
-      console.error('Error saving workflow to database:', error)
-    }
-  }
-
-  const removeWorkflowFromDatabase = async (workflowId) => {
-    try {
-      await supabase.from('workflows').delete().eq('id', workflowId)
-    } catch (error) {
-      console.error('Error removing workflow from database:', error)
-    }
-  }
-
-  const updateTokenCount = async (count) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({ 
-          token_count: (profile.token_count || 0) + count 
-        })
-        .eq('id', user.id)
-
-      if (error) throw error
-    } catch (error) {
-      console.error('Error updating token count:', error)
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false })
     }
   }
 
   const value = {
     ...state,
-    loadWorkflows,
     createWorkflow,
     updateWorkflow,
     deleteWorkflow,
-    executeWorkflow,
-    loadCredentials,
-    createCredential,
-    updateCredential,
-    deleteCredential,
-    loadWebhooks,
-    createWebhook,
-    deleteWebhook
+    executeWorkflow
   }
 
   return (

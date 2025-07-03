@@ -31,7 +31,6 @@ const Header = ({ sidebarOpen, setSidebarOpen }) => {
           >
             <SafeIcon icon={FiMenu} className="w-6 h-6 text-gray-600" />
           </button>
-          
           <Link to="/dashboard" className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">N8</span>
